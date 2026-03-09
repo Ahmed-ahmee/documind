@@ -1,2 +1,0 @@
-DocuMind RAG sample document.
-This file is auto-created by tests/test_pipeline.py when no input documents are present.

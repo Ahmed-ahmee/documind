@@ -32,25 +32,32 @@ class DocumentLoader:
         
         raise ValueError(f"Path is neither file nor Directory:{self.data_path}")
 
-    def _load_single_file(self, file_path: Path) ->List[Document]:
+    def _load_single_file(self, file_path: Path) -> List[Document]:
         ext = file_path.suffix.lower()
 
         if ext not in self.SUPPORTED_EXTENSIONS:
-            raise ValueError(f"Unsupported file type: {ext}")
-        
-        print(f"Loading: {file_path.name}")
+            raise ValueError(
+                f"Unsupported file type: {ext}. "
+                f"Supported: {self.SUPPORTED_EXTENSIONS}"
+            )
+
+        print(f"  Loading: {file_path.name}")
 
         if ext == ".pdf":
             loader = PyPDFLoader(str(file_path))
-        else:
+        elif ext == ".txt":
             loader = TextLoader(str(file_path), encoding="utf-8")
 
         documents = loader.load()
 
-        # Enrich metadata - this powers source citations later
+        # ✅ Keep ONLY what we need — clean metadata for citations
         for doc in documents:
-            doc.metadata["source"] = file_path.name
-            doc.metadata["file_type"] = ext
+            page = doc.metadata.get("page", 0)
+            doc.metadata = {
+                "source"    : file_path.name,
+                "file_type" : ext,
+                "page"      : page,
+            }
 
         return documents
     
