@@ -1,56 +1,37 @@
+# tests/test_pipeline.py
+
 import sys
-from pathlib import Path
+sys.path.append(".")
 
-sys.path.append(".")  # makes src/ importable from project root
-
-from src.ingestion.loader import DocumentLoader
-from src.ingestion.chunker import DocumentChunker
+from src.pipeline.rag_pipeline import RAGPipeline
 
 
-def _ensure_test_document(data_dir: Path) -> None:
-    data_dir.mkdir(parents=True, exist_ok=True)
-    has_supported_file = any(
-        file_path.is_file() and file_path.suffix.lower() in {".pdf", ".txt"}
-        for file_path in data_dir.iterdir()
-    )
-    if has_supported_file:
-        return
-
-    sample_path = data_dir / "sample.txt"
-    sample_path.write_text(
-        "DocuMind RAG sample document.\n"
-        "This file is auto-created by tests/test_pipeline.py when no input "
-        "documents are present.\n",
-        encoding="utf-8",
-    )
-    print(f"Created sample input file: {sample_path}")
-
-
-def test_ingestion() -> None:
-    print("=" * 50)
-    print("TEST: Document Ingestion Pipeline")
-    print("=" * 50)
-
-    data_dir = Path("data/documents")
-    _ensure_test_document(data_dir)
-
-    # Step 1: Load
-    loader = DocumentLoader(str(data_dir))
-    documents = loader.load()
-
-    print(f"\nLoaded {len(documents)} page(s)")
-    print(f"   First 200 chars: {documents[0].page_content[:200]}")
-    print(f"   Metadata: {documents[0].metadata}")
-
-    # Step 2: Chunk
-    chunker = DocumentChunker(chunk_size=500, chunk_overlap=50)
-    chunks = chunker.chunk(documents)
-
-    sample_chunk = chunks[min(5, len(chunks) - 1)]
-    print("\nSample chunk:")
-    print(f"   Content: {sample_chunk.page_content[:200]}")
-    print(f"   Metadata: {sample_chunk.metadata}")
+def _safe_console(text: str) -> str:
+    encoding = sys.stdout.encoding or "utf-8"
+    return text.encode(encoding, errors="replace").decode(encoding, errors="replace")
 
 
 if __name__ == "__main__":
-    test_ingestion()
+
+    pipeline = RAGPipeline()
+
+    # Ingest once — skips automatically if already indexed
+    pipeline.ingest()
+    
+    print("\n--- DEBUG: Raw chunks for optimizer query ---")
+    chunks = pipeline.store.similarity_search("Adam optimizer learning rate training", k=4)
+    for c in chunks:
+        print(f"\nPage {c.metadata['page']} | Chunk {c.metadata['chunk_id']}")
+        print(_safe_console(c.page_content[:300]))
+        print("---")
+
+    # Ask real questions
+    questions = [
+        "What is multi-head attention and why is it useful?",
+        "What BLEU score did the Transformer achieve on English-German translation?",
+        "What optimizer was used during training?",
+    ]
+
+    for question in questions:
+        response = pipeline.query(question)
+        pipeline.print_response(response)
